@@ -6,7 +6,7 @@ const router = express.Router();
 // POST /api/chat
 router.post('/chat', async (req, res) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, context, ingredients, allergens } = req.body;
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({
@@ -15,17 +15,22 @@ router.post('/chat', async (req, res) => {
       });
     }
 
-    const reply = await askSousChefWithAI(message.trim(), Array.isArray(history) ? history : []);
+    const { reply, source } = await askSousChefWithAI(
+      message.trim(),
+      Array.isArray(history) ? history : [],
+      context || { ingredients, allergens }
+    );
 
     return res.status(200).json({
       success: true,
       reply,
+      source: source || 'gemini',
     });
   } catch (error) {
-    console.error('Error in /api/chat:', error);
+    console.error('Error in /api/chat:', error.message, error.status ? `(status: ${error.status})` : '');
     return res.status(500).json({
       success: false,
-      error: 'Chef is temporarily caught at the stove. Please ask again!',
+      error: 'Chef Auguste is temporarily caught at the stove. Please try again in a moment!',
     });
   }
 });

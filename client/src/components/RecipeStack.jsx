@@ -3,10 +3,36 @@ import { motion } from 'framer-motion';
 import { Layers, LayoutGrid, Sparkles } from 'lucide-react';
 import RecipeCard from './RecipeCard';
 
+/**
+ * Skeleton card component for loading states
+ */
+function RecipeCardSkeleton() {
+  return (
+    <div className="card-base p-6 md:p-7 space-y-4 animate-pulse">
+      <div className="flex items-center justify-between">
+        <div className="h-5 w-24 bg-paper-border/60 rounded-full" />
+        <div className="h-8 w-28 bg-paper-border/60 rounded-btn" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-7 w-2/3 bg-paper-border/70 rounded-md" />
+        <div className="h-4 w-full bg-paper-border/50 rounded" />
+        <div className="h-4 w-4/5 bg-paper-border/50 rounded" />
+      </div>
+      <div className="h-10 w-full bg-paper-border/40 rounded-btn" />
+      <div className="flex gap-2">
+        <div className="h-6 w-20 bg-paper-border/50 rounded-full" />
+        <div className="h-6 w-16 bg-paper-border/50 rounded-full" />
+        <div className="h-6 w-24 bg-paper-border/50 rounded-full" />
+      </div>
+    </div>
+  );
+}
+
 export default function RecipeStack({
-  recipes,
+  recipes = [],
   favorites = [],
   savingId = null,
+  isLoading = false,
   onSaveRecipe,
   onDeleteFavorite,
   isFavoriteView = false,
@@ -14,15 +40,30 @@ export default function RecipeStack({
   onOpenGroceryGap,
   onPublishCommunity,
   pantryIngredients = [],
+  onStartTimer,
 }) {
-  const [viewMode, setViewMode] = useState('stack'); // 'stack' or 'grid'
+  const [viewMode, setViewMode] = useState('stack');
+
+  // Loading skeleton state
+  if (isLoading) {
+    return (
+      <div className="w-full space-y-4 pt-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="h-6 w-44 bg-paper-border/60 rounded-md animate-pulse" />
+        </div>
+        <div className="space-y-6">
+          <RecipeCardSkeleton />
+          <RecipeCardSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   if (!recipes || recipes.length === 0) {
     return null;
   }
 
-  // Alternating slight rotations for the tactile stacked index card feel
-  const rotations = [-1.5, 1.8, -1.2, 1.4, -1.6, 1.2];
+  const rotations = [-1.2, 1.4, -0.8, 1.2, -1.0, 0.8];
 
   const checkIfSaved = (recipe) => {
     const title = recipe.title || recipe.recipeTitle;
@@ -33,49 +74,49 @@ export default function RecipeStack({
 
   return (
     <div className="w-full">
-      {/* Stack Controls & Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-2 border-b border-[#E4D7BF]">
+      {/* Controls & Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-3 border-b border-paper-border">
         <div>
-          <h2 className="font-serif text-2xl md:text-3xl font-bold text-charcoal flex items-center gap-2">
-            <span>{isFavoriteView ? 'Saved Recipe Ledger' : 'Freshly Inked Recipes'}</span>
-            <span className="font-sans text-xs font-bold uppercase bg-tomato/15 text-tomato px-2.5 py-1 rounded-full border border-tomato/30">
-              {recipes.length} {recipes.length === 1 ? 'Card' : 'Cards'}
+          <h2 className="font-heading text-2xl md:text-3xl font-bold text-ink flex items-center gap-2">
+            <span>{isFavoriteView ? 'My Recipes' : 'Suggested Recipes'}</span>
+            <span className="text-xs font-semibold bg-tomato/15 text-tomato px-2.5 py-0.5 rounded-full border border-tomato/30">
+              {recipes.length} {recipes.length === 1 ? 'Recipe' : 'Recipes'}
             </span>
           </h2>
-          <p className="text-xs md:text-sm text-charcoal-muted font-sans mt-0.5">
+          <p className="text-xs md:text-sm text-ink-muted mt-0.5">
             {isFavoriteView
-              ? 'Flip through the recipes stamped into your private box'
-              : 'Hand-crafted AI recipe suggestions utilizing your pantry items'}
+              ? 'Your saved collection of dishes ready to cook'
+              : 'Recipes crafted to make the most of your pantry ingredients'}
           </p>
         </div>
 
         {/* View Layout Toggle */}
-        <div className="flex items-center bg-[#F3EBDD] p-1 rounded-xl border border-[#DECFA4]">
+        <div className="flex items-center bg-paper p-1 rounded-btn border border-paper-border">
           <button
             type="button"
             onClick={() => setViewMode('stack')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium font-mono transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs font-semibold transition-all cursor-pointer ${
               viewMode === 'stack'
-                ? 'bg-[#FAF5E8] text-charcoal shadow-sm border border-[#D9CBAC]'
-                : 'text-charcoal-muted hover:text-charcoal'
+                ? 'bg-paper-card text-ink shadow-sm border border-paper-border'
+                : 'text-ink-muted hover:text-ink'
             }`}
-            title="Fanned Index Card Stack"
+            title="Single Column Stack"
           >
             <Layers className="w-3.5 h-3.5 text-tomato" />
-            <span className="hidden sm:inline">Fanned Stack</span>
+            <span className="hidden sm:inline">Stack</span>
           </button>
           <button
             type="button"
             onClick={() => setViewMode('grid')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium font-mono transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs font-semibold transition-all cursor-pointer ${
               viewMode === 'grid'
-                ? 'bg-[#FAF5E8] text-charcoal shadow-sm border border-[#D9CBAC]'
-                : 'text-charcoal-muted hover:text-charcoal'
+                ? 'bg-paper-card text-ink shadow-sm border border-paper-border'
+                : 'text-ink-muted hover:text-ink'
             }`}
-            title="Side-by-side Recipe Grid"
+            title="Side-by-side Grid"
           >
-            <LayoutGrid className="w-3.5 h-3.5 text-sage" />
-            <span className="hidden sm:inline">Grid Spread</span>
+            <LayoutGrid className="w-3.5 h-3.5 text-basil" />
+            <span className="hidden sm:inline">Grid</span>
           </button>
         </div>
       </div>
@@ -108,6 +149,7 @@ export default function RecipeStack({
               onOpenGroceryGap={onOpenGroceryGap}
               onPublishCommunity={onPublishCommunity}
               pantryIngredients={pantryIngredients}
+              onStartTimer={onStartTimer}
             />
           );
         })}

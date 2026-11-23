@@ -1,205 +1,371 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Sparkles, Camera, Clock, AlertTriangle } from 'lucide-react';
+import {
+  X,
+  Plus,
+  Sparkles,
+  Camera,
+  Calendar,
+  Layers,
+  ChevronDown,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react';
+import { getIngredientEmoji, getIngredientCategory } from '../utils/foodImageHelper';
 
-const COMMON_STAPLES = [
+const COMMON_SUGGESTIONS = [
   'Eggs',
   'Garlic',
   'Onion',
   'Tomatoes',
+  'Olive Oil',
   'Pasta',
   'Rice',
-  'Olive Oil',
   'Cheddar Cheese',
+  'Parmesan',
   'Potatoes',
   'Chicken Breast',
   'Spinach',
   'Lemon',
   'Bell Pepper',
   'Black Beans',
+  'Butter',
+  'Milk',
+  'Carrots',
+  'Broccoli',
+  'Mushrooms',
+  'Ground Beef',
+  'Flour',
+  'Bread',
+  'Greek Yogurt',
+  'Avocado',
+  'Heavy Cream',
+  'Zucchini',
+  'Bacon',
+  'Soy Sauce',
+  'Honey',
 ];
 
-// Custom Mini Jar Icon Component
-const JarIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {/* Jar Lid */}
-    <rect x="7" y="2" width="10" height="3" rx="1" fill="#D9A441" stroke="#2B2320" strokeWidth="1.5" />
-    <line x1="6" y1="5" x2="18" y2="5" stroke="#2B2320" strokeWidth="1.5" />
-    {/* Jar Body */}
-    <path
-      d="M6 6 C6 5.5, 6.5 5, 7 5 L17 5 C17.5 5, 18 5.5, 18 6 L18 19 C18 20.5, 16.5 22, 15 22 L9 22 C7.5 22, 6 20.5, 6 19 Z"
-      fill="#FAF4E6"
-      stroke="#2B2320"
-      strokeWidth="1.5"
-    />
-    {/* Jar Label Line */}
-    <rect x="8" y="10" width="8" height="6" rx="1" stroke="#C1502E" strokeWidth="1" strokeDasharray="2 1" fill="#FAF5E8" />
-  </svg>
-);
+const CATEGORIES = ['All', 'Vegetables', 'Dairy', 'Protein', 'Grains', 'Pantry staples'];
 
 export default function IngredientInput({
-  ingredients,
-  expiringItems = [],
+  ingredients = [],
   onAddIngredient,
   onRemoveIngredient,
-  onToggleExpiry,
   onClearAll,
   onOpenScanner,
 }) {
   const [inputValue, setInputValue] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isFocused, setIsFocused] = useState(false);
+  const dropdownRef = useRef(null);
 
-  const handleAdd = (name) => {
-    const trimmed = (name || inputValue).trim();
-    if (!trimmed) return;
-    
-    const exists = ingredients.some(
-      (item) => item.toLowerCase() === trimmed.toLowerCase()
+  // Normalize ingredients to uniform objects
+  const normalizedIngredients = ingredients.map((item, idx) => {
+    if (typeof item === 'string') {
+      return {
+        id: `ing-${idx}-${item}`,
+        name: item,
+        quantity: '',
+        expiryDate: '',
+        category: getIngredientCategory(item),
+      };
+    }
+    return {
+      ...item,
+      id: item.id || `ing-${idx}-${item.name}`,
+      category: item.category || getIngredientCategory(item.name),
+    };
+  });
+
+  // Autocomplete matching
+  const matchingSuggestions = inputValue.trim()
+    ? COMMON_SUGGESTIONS.filter(
+        (s) =>
+          s.toLowerCase().includes(inputValue.toLowerCase()) &&
+          !normalizedIngredients.some((i) => i.name.toLowerCase() === s.toLowerCase())
+      ).slice(0, 5)
+    : [];
+
+  const handleAdd = (itemName) => {
+    const nameToAdd = (itemName || inputValue).trim();
+    if (!nameToAdd) return;
+
+    const exists = normalizedIngredients.some(
+      (item) => item.name.toLowerCase() === nameToAdd.toLowerCase()
     );
     if (!exists) {
-      onAddIngredient(trimmed);
+      onAddIngredient({
+        name: nameToAdd,
+        quantity: quantity.trim(),
+        expiryDate: expiryDate,
+        category: getIngredientCategory(nameToAdd),
+      });
     }
+
     setInputValue('');
+    setQuantity('');
+    setExpiryDate('');
+    setShowAdvanced(false);
+    setIsFocused(false);
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleAdd();
     }
   };
 
+  // Helper to check if ingredient is expiring soon
+  const isExpiring = (expDate) => {
+    if (!expDate) return false;
+    const exp = new Date(expDate);
+    const now = new Date();
+    const diffDays = (exp - now) / (1000 * 60 * 60 * 24);
+    return diffDays <= 2;
+  };
+
+  // Filtered ingredients by category tab
+  const filteredIngredients =
+    selectedCategory === 'All'
+      ? normalizedIngredients
+      : normalizedIngredients.filter((i) => i.category === selectedCategory);
+
   return (
-    <div className="w-full bg-[#FAF5E8] border-2 border-[#E3D7BE] rounded-2xl p-5 md:p-7 shadow-card-soft">
-      {/* Ledger Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-[#E3D7BE]/80">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-[#FAF0D9] border border-mustard/40 rounded-lg text-charcoal">
-            <JarIcon className="w-5 h-5 text-tomato" />
-          </div>
-          <div>
-            <h3 className="font-serif text-lg md:text-xl font-bold text-charcoal tracking-tight flex items-center gap-2">
-              Pantry Inventory
-              <span className="text-xs font-mono font-normal bg-mustard/20 text-charcoal px-2 py-0.5 rounded-full border border-mustard/30">
-                {ingredients.length} items logged
-              </span>
-            </h3>
-            <p className="text-xs text-charcoal-muted font-sans">
-              Type items or snap a photo of your fridge & grocery receipts
-            </p>
-          </div>
+    <div className="w-full bg-paper-card border border-paper-border rounded-card p-5 md:p-7 shadow-card-soft space-y-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-paper-border">
+        <div>
+          <h3 className="font-heading text-lg md:text-xl font-bold text-ink tracking-tight flex items-center gap-2">
+            <span>Pantry Inventory</span>
+            <span className="text-xs font-semibold bg-paper-muted text-ink px-2.5 py-0.5 rounded-full border border-paper-border">
+              {normalizedIngredients.length} items
+            </span>
+          </h3>
+          <p className="text-xs text-ink-muted">
+            Add ingredients with optional quantity and expiry dates, or snap a photo.
+          </p>
         </div>
 
-        {/* Action Controls: Photo Scanner & Clear */}
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onOpenScanner}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tomato/15 hover:bg-tomato/25 text-tomato border border-tomato/30 text-xs font-mono font-bold transition-all shadow-sm"
-            title="Scan Fridge or Receipt with Gemini Vision"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-tomato/10 hover:bg-tomato/20 text-tomato text-xs font-semibold transition-all shadow-sm cursor-pointer"
+            title="Scan Fridge or Receipt with Camera"
           >
             <Camera className="w-3.5 h-3.5" />
             <span>Scan Photo</span>
           </button>
 
-          {ingredients.length > 0 && (
+          {normalizedIngredients.length > 0 && (
             <button
               type="button"
               onClick={onClearAll}
-              className="text-xs font-mono text-charcoal-muted hover:text-tomato underline decoration-dotted transition-colors"
+              className="text-xs text-ink-muted hover:text-tomato transition-colors cursor-pointer"
             >
-              Clear shelf
+              Clear all
             </button>
           )}
         </div>
       </div>
 
-      {/* Input Field */}
-      <div className="flex gap-2 mb-4">
-        <div className="relative flex-1">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="e.g. Garlic, Pasta, Canned Tomatoes, Eggs, Spinach..."
-            className="w-full bg-[#FBF7EE] text-charcoal placeholder-charcoal-muted/60 px-4 py-3 pl-4 rounded-xl border-2 border-[#D9CBAC] focus:outline-none focus:border-tomato focus:ring-2 focus:ring-tomato/20 font-medium transition-all text-sm md:text-base"
-          />
+      {/* Input Form with Autocomplete */}
+      <div className="space-y-2 relative">
+        <div className="flex flex-col sm:flex-row gap-2">
+          {/* Main Ingredient Text Input */}
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type an ingredient (e.g. Eggs, Garlic, Rice)..."
+              className="w-full bg-paper text-ink placeholder-ink-muted/60 px-4 py-3 rounded-btn border border-paper-border focus:outline-none focus:border-tomato text-sm font-medium transition-all"
+            />
+
+            {/* Autocomplete Suggestions Dropdown */}
+            {isFocused && matchingSuggestions.length > 0 && (
+              <div
+                ref={dropdownRef}
+                className="absolute left-0 right-0 top-full mt-1.5 bg-paper-card border border-paper-border rounded-btn shadow-card-elevated z-30 overflow-hidden divide-y divide-paper-border"
+              >
+                {matchingSuggestions.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onMouseDown={() => handleAdd(item)}
+                    className="w-full px-4 py-2.5 text-left text-xs sm:text-sm hover:bg-tomato/10 flex items-center justify-between text-ink cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2 font-medium">
+                      <span>{getIngredientEmoji(item)}</span>
+                      <span>{item}</span>
+                    </span>
+                    <span className="text-[11px] text-ink-muted">
+                      {getIngredientCategory(item)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Add Button */}
+          <button
+            type="button"
+            onClick={() => handleAdd()}
+            disabled={!inputValue.trim()}
+            className="px-5 py-3 bg-tomato hover:bg-tomato-hover disabled:opacity-40 text-white font-semibold text-sm rounded-btn shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add ingredient</span>
+          </button>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          type="button"
-          onClick={() => handleAdd()}
-          disabled={!inputValue.trim()}
-          className="px-5 py-3 bg-tomato hover:bg-tomato-hover disabled:opacity-40 disabled:hover:bg-tomato text-white font-serif font-bold text-sm rounded-xl shadow-sm transition-all flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Jar</span>
-        </motion.button>
+
+        {/* Optional Quantity & Expiry Expand Toggle */}
+        <div className="flex items-center justify-between text-xs pt-1">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-ink-muted hover:text-ink flex items-center gap-1 font-medium cursor-pointer"
+          >
+            <span>{showAdvanced ? '− Hide' : '+ Add'} quantity & expiry date</span>
+          </button>
+        </div>
+
+        {/* Collapsible Quantity and Expiry Inputs */}
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 overflow-hidden"
+            >
+              <div>
+                <label className="text-[11px] text-ink-muted font-medium block mb-1">
+                  Quantity (optional)
+                </label>
+                <input
+                  type="text"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  placeholder="e.g. 2 cups, 500g, 3 cloves"
+                  className="w-full bg-paper text-ink px-3 py-2 rounded-btn border border-paper-border text-xs focus:outline-none focus:border-tomato"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-ink-muted font-medium block mb-1">
+                  Expiry Date (optional)
+                </label>
+                <input
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  className="w-full bg-paper text-ink px-3 py-2 rounded-btn border border-paper-border text-xs focus:outline-none focus:border-tomato"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Jar Label Chips Shelf */}
-      <div className="min-h-[64px] p-3 bg-[#F4EDE0]/60 rounded-xl border border-[#E3D7BE] mb-4">
-        {ingredients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-4 text-center">
-            <span className="font-handwritten text-lg text-charcoal-muted">
-              Your pantry shelf is currently bare...
+      {/* Category Tabs */}
+      {normalizedIngredients.length > 0 && (
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pt-2 border-t border-paper-border">
+          {CATEGORIES.map((cat) => {
+            const count =
+              cat === 'All'
+                ? normalizedIngredients.length
+                : normalizedIngredients.filter((i) => i.category === cat).length;
+            if (cat !== 'All' && count === 0) return null;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`text-xs px-3 py-1 rounded-full font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                  selectedCategory === cat
+                    ? 'bg-ink text-paper font-semibold'
+                    : 'bg-paper text-ink-muted hover:text-ink border border-paper-border'
+                }`}
+              >
+                {cat} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Ingredients Shelf */}
+      <div className="min-h-[72px] p-3.5 bg-paper rounded-card border border-paper-border">
+        {normalizedIngredients.length === 0 ? (
+          <div className="py-6 text-center space-y-1">
+            <span className="text-sm font-medium text-ink">
+              Your pantry is empty
             </span>
-            <p className="text-xs text-charcoal-muted/80 mt-0.5">
-              Add ingredients above, tap staples below, or scan a photo to auto-fill!
+            <p className="text-xs text-ink-muted">
+              Type ingredients above or click quick staples below to add them to your shelf!
             </p>
           </div>
+        ) : filteredIngredients.length === 0 ? (
+          <div className="py-4 text-center text-xs text-ink-muted">
+            No ingredients in the "{selectedCategory}" category.
+          </div>
         ) : (
-          <div className="flex flex-wrap gap-2.5 items-center">
-            <AnimatePresence mode="popLayout">
-              {ingredients.map((item) => {
-                const isExpiring = expiringItems.includes(item);
+          <div className="flex flex-wrap gap-2">
+            <AnimatePresence>
+              {filteredIngredients.map((item) => {
+                const expiring = isExpiring(item.expiryDate);
                 return (
                   <motion.div
-                    key={item}
-                    initial={{ scale: 0.7, opacity: 0, y: 8 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    exit={{ scale: 0.6, opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2 }}
-                    className={`jar-token group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-lg border-2 transition-all ${
-                      isExpiring
-                        ? 'border-mustard bg-[#FFF7E6] shadow-sm'
-                        : 'border-[#D5C6A6] bg-[#FAF5E8]'
+                    key={item.id || item.name}
+                    initial={{ scale: 0.85, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    layout
+                    className={`inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full text-xs font-medium border shadow-sm transition-all ${
+                      expiring
+                        ? 'bg-butter/25 text-ink border-butter-hover/50'
+                        : 'bg-paper-card text-ink border-paper-border hover:border-ink/20'
                     }`}
                   >
-                    <JarIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="font-mono text-xs md:text-sm font-semibold text-charcoal tracking-tight capitalize">
-                      {item}
+                    <span className="text-base select-none">
+                      {getIngredientEmoji(item.name)}
                     </span>
+                    <span className="font-semibold">{item.name}</span>
 
-                    {/* Expiry Tag Toggle */}
+                    {item.quantity && (
+                      <span className="text-[11px] text-ink-muted bg-paper px-1.5 py-0.5 rounded-full border border-paper-border">
+                        {item.quantity}
+                      </span>
+                    )}
+
+                    {item.expiryDate && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
+                          expiring
+                            ? 'bg-tomato text-white font-bold'
+                            : 'bg-paper text-ink-muted border border-paper-border'
+                        }`}
+                        title={`Expires: ${item.expiryDate}`}
+                      >
+                        {expiring && <AlertTriangle className="w-2.5 h-2.5" />}
+                        {item.expiryDate.slice(5)}
+                      </span>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() => onToggleExpiry && onToggleExpiry(item)}
-                      className={`px-1 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                        isExpiring
-                          ? 'bg-mustard/30 text-charcoal font-bold'
-                          : 'opacity-40 hover:opacity-100 hover:bg-mustard/20 text-charcoal-muted'
-                      }`}
-                      title={isExpiring ? 'Marked as expiring soon' : 'Click to tag as expiring soon'}
-                    >
-                      {isExpiring ? '⚠️ Expiring' : '⏳'}
-                    </button>
-
-                    {/* Remove Jar Token */}
-                    <button
-                      type="button"
-                      onClick={() => onRemoveIngredient(item)}
-                      className="p-0.5 rounded-full hover:bg-tomato/20 hover:text-tomato text-charcoal-muted transition-colors ml-0.5"
-                      title={`Remove ${item}`}
+                      onClick={() => onRemoveIngredient(item.name)}
+                      aria-label={`Remove ${item.name}`}
+                      className="p-1 rounded-full text-ink-muted hover:text-tomato hover:bg-tomato/10 transition-colors ml-0.5 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -211,34 +377,30 @@ export default function IngredientInput({
         )}
       </div>
 
-      {/* Quick Staples Pantry Picker */}
-      <div className="pt-2 border-t border-[#E3D7BE]/70">
-        <span className="text-xs font-mono uppercase tracking-wider text-charcoal-muted font-bold block mb-2">
-          ★ Quick Pantry Staples (tap to add):
+      {/* Quick Staples Bar */}
+      <div className="pt-2">
+        <span className="text-[11px] text-ink-muted block mb-2 font-medium">
+          Quick add pantry staples:
         </span>
         <div className="flex flex-wrap gap-1.5">
-          {COMMON_STAPLES.map((staple) => {
-            const isAdded = ingredients.some(
-              (i) => i.toLowerCase() === staple.toLowerCase()
+          {COMMON_SUGGESTIONS.slice(0, 10).map((staple) => {
+            const isAdded = normalizedIngredients.some(
+              (i) => i.name.toLowerCase() === staple.toLowerCase()
             );
             return (
               <button
                 key={staple}
                 type="button"
-                onClick={() => !isAdded && handleAdd(staple)}
+                onClick={() => handleAdd(staple)}
                 disabled={isAdded}
-                className={`text-xs font-sans px-2.5 py-1 rounded-md border transition-all flex items-center gap-1 ${
+                className={`text-xs px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 cursor-pointer ${
                   isAdded
-                    ? 'bg-sage/20 text-sage-hover border-sage/40 opacity-70 cursor-default'
-                    : 'bg-[#FBF7EE] text-charcoal/80 border-[#DDD2BE] hover:border-tomato hover:text-tomato hover:bg-tomato/5'
+                    ? 'opacity-40 bg-paper-muted border-paper-border text-ink-muted cursor-not-allowed'
+                    : 'bg-paper text-ink border-paper-border hover:border-tomato hover:text-tomato'
                 }`}
               >
+                <span>{getIngredientEmoji(staple)}</span>
                 <span>{staple}</span>
-                {isAdded ? (
-                  <span className="text-[10px] font-mono">✓</span>
-                ) : (
-                  <span className="text-charcoal-muted/60 text-[10px]">+</span>
-                )}
               </button>
             );
           })}

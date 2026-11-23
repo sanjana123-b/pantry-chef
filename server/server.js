@@ -1,7 +1,7 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -14,8 +14,6 @@ import chatRouter from './routes/chat.js';
 import visionRouter from './routes/vision.js';
 import communityRouter from './routes/community.js';
 import imageGenRouter from './routes/imageGen.js';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,5 +81,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`\n🍲 PantryChef Server running on http://localhost:${PORT}`);
-  console.log(`📜 Ready to craft recipes from pantry staples\n`);
+  console.log(`📜 Ready to craft recipes from pantry staples`);
+  console.log(`🔑 Gemini API Key: ${process.env.GEMINI_API_KEY ? 'Detected' : 'Not detected (running in fallback mode)'}`);
+  console.log(`🤖 Gemini Model: ${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}\n`);
 });

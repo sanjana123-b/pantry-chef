@@ -134,14 +134,14 @@ export async function logoutChef() {
 }
 
 // AI Sous-Chef Chatbot
-export async function askSousChef(message, history = []) {
+export async function askSousChef(message, history = [], context = {}) {
   const response = await fetch(`${BASE_URL}/api/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     credentials: 'include',
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, ...context }),
   });
 
   const data = await response.json();
@@ -149,7 +149,10 @@ export async function askSousChef(message, history = []) {
     throw new Error(data.error || 'Sous-Chef is currently busy at the stove');
   }
 
-  return data.reply;
+  return {
+    reply: data.reply,
+    source: data.source || 'gemini',
+  };
 }
 
 // Multimodal Visual Photo Scanner

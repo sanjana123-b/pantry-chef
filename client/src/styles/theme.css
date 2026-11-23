@@ -2,120 +2,119 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-ink: #1f1b16;
+  --color-ink-muted: #6e6459;
+  --color-paper: #fffaf0;
+  --color-paper-card: #ffffff;
+  --color-paper-muted: #f5eedf;
+  --color-paper-border: #e8dec8;
+  --color-tomato: #e8452c;
+  --color-tomato-hover: #cf3821;
+  --color-tomato-light: #fdedea;
+  --color-basil: #2f7d4f;
+  --color-basil-hover: #266640;
+  --color-basil-light: #eaf5ee;
+  --color-butter: #ffc83d;
+  --color-butter-hover: #e6b230;
+  --color-butter-light: #fff8e6;
+  --color-plum: #3b2a4a;
+  --color-plum-dark: #271a33;
+  --color-plum-light: #4f3963;
+  --color-plum-paper: #f0e9f7;
+  --radius-card: 20px;
+  --radius-btn: 14px;
+}
+
+[data-theme="dark"] {
+  --color-ink: #fff4e0;
+  --color-ink-muted: #b8a896;
+  --color-paper: #17130f;
+  --color-paper-card: #201a15;
+  --color-paper-muted: #27201a;
+  --color-paper-border: #3b2f26;
+  --color-tomato: #ff5e45;
+  --color-tomato-hover: #e8452c;
+  --color-tomato-light: #3a1c17;
+  --color-basil: #3ca066;
+  --color-basil-hover: #2f7d4f;
+  --color-basil-light: #162f20;
+  --color-butter: #ffd45e;
+  --color-butter-hover: #ffc83d;
+  --color-butter-light: #382c0f;
+  --color-plum: #281c33;
+  --color-plum-dark: #170f20;
+  --color-plum-light: #3e2b50;
+  --color-plum-paper: #fff4e0;
+}
+
 @layer base {
   body {
-    background-color: #F7F2E9;
-    color: #2B2320;
-    font-family: 'Work Sans', 'Inter', system-ui, sans-serif;
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 
-  h1, h2, h3, h4, .font-serif {
-    font-family: 'Fraunces', 'DM Serif Display', Georgia, serif;
+  h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .font-mono-timer {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Torn Edge & Tactile Ledger Stylings */
-.torn-divider {
-  height: 16px;
-  background-image: radial-gradient(circle at 10px 0, transparent 0, transparent 8px, #F7F2E9 9px);
-  background-size: 20px 20px;
-  background-repeat: repeat-x;
+/* Card & Button Base Utility Classes */
+.card-base {
+  background-color: var(--color-paper-card);
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 4px 20px -2px rgba(31, 27, 22, 0.05), 0 2px 6px -1px rgba(31, 27, 22, 0.03);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.torn-paper-top {
-  position: relative;
+[data-theme="dark"] .card-base {
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.2);
 }
 
-.torn-paper-top::before {
-  content: "";
-  position: absolute;
-  top: -6px;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background-image: radial-gradient(circle at 6px 6px, #FBF7EE 6px, transparent 0);
-  background-size: 12px 12px;
-  background-repeat: repeat-x;
+.btn-base {
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Handwritten Note Accent Underline */
-.hand-stamped-underline {
-  position: relative;
-  display: inline-block;
+/* Soft layered section variations */
+.section-plum {
+  background-color: var(--color-plum);
+  color: #fff4e0;
 }
 
-.hand-stamped-underline::after {
-  content: "";
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 6' preserveAspectRatio='none'%3E%3Cpath d='M0,3 Q25,0 50,3 T100,3' fill='none' stroke='%23C1502E' stroke-width='2.5' stroke-linecap='round' opacity='0.75'/%3E%3C/svg%3E");
-  background-size: 100% 100%;
+.section-plum h2, .section-plum h3, .section-plum h4 {
+  color: #ffffff;
 }
 
-.hand-stamped-mustard::after {
-  content: "";
-  position: absolute;
-  bottom: -3px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 6' preserveAspectRatio='none'%3E%3Cpath d='M0,3 Q25,6 50,3 T100,3' fill='none' stroke='%23D9A441' stroke-width='3' stroke-linecap='round' opacity='0.8'/%3E%3C/svg%3E");
-  background-size: 100% 100%;
-}
-
-/* Recipe Index Card Styles */
-.index-card {
-  background-color: #FBF7EE;
-  border: 1px solid #E8DEC8;
-  position: relative;
-  box-shadow: 0 4px 16px -2px rgba(43, 35, 32, 0.08), 0 2px 4px -1px rgba(43, 35, 32, 0.04);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
-}
-
-.index-card:hover {
-  box-shadow: 0 16px 36px -4px rgba(43, 35, 32, 0.14), 0 6px 12px -2px rgba(43, 35, 32, 0.06);
-}
-
-/* Stitched top border effect */
-.stitched-border {
-  border-top: 2px dashed #D5C7AF;
-}
-
-/* Jar Token Label Styling */
-.jar-token {
-  background: #FAF5E8;
-  border: 1.5px solid #D9CBAC;
-  box-shadow: 0 2px 4px rgba(43, 35, 32, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-/* Stamp Effect */
-.stamp-seal {
-  border: 3px double #C1502E;
-  color: #C1502E;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  mask-image: radial-gradient(circle, black 70%, transparent 100%);
+.section-plum p {
+  color: #e5d8f0;
 }
 
 /* Custom subtle scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #F1E9DB;
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D9CBAC;
-  border-radius: 4px;
+  background: var(--color-paper-border);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #B8A684;
+  background: var(--color-ink-muted);
 }

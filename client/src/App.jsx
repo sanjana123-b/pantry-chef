@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from './components/Navbar';
 import Landing from './pages/Landing';
 import Home from './pages/Home';
@@ -11,6 +12,7 @@ import ChatbotDrawer from './components/ChatbotDrawer';
 import PhotoScannerModal from './components/PhotoScannerModal';
 import AllergenSettingsModal from './components/AllergenSettingsModal';
 import GroceryGapModal from './components/GroceryGapModal';
+import ToolDock from './components/ToolDock';
 import {
   getFavorites,
   saveFavorite,
@@ -28,6 +30,29 @@ export default function App() {
     chefTitle: 'Pantry Explorer',
     isGuest: true,
   });
+
+  // Dark Theme Management (persisted in localStorage + system preference fallback)
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('pantrychef_theme');
+    if (saved) return saved;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('pantrychef_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Allergen & Dietary Safety Profile (persisted)
   const [allergenProfile, setAllergenProfile] = useState(() => {
@@ -128,7 +153,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7F2E9] text-[#2B2320] font-sans selection:bg-mustard/30 selection:text-charcoal">
+    <div className="min-h-screen flex flex-col bg-paper text-ink font-sans selection:bg-butter/30 selection:text-ink transition-colors">
       {/* Top Navbar */}
       <Navbar
         currentTab={currentTab}
@@ -136,62 +161,111 @@ export default function App() {
         favoritesCount={favorites.length}
         user={user}
         onLogout={handleLogout}
-        onOpenTimer={() => setIsTimerOpen(true)}
-        onOpenConverter={() => setIsConverterOpen(true)}
-        onToggleChat={() => setIsChatOpen(!isChatOpen)}
-        onOpenScanner={() => setIsScannerOpen(true)}
-        onOpenAllergens={() => setIsAllergensOpen(true)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
-      {/* Main Pages */}
-      <main className="flex-1">
-        {currentTab === 'landing' && (
-          <Landing
-            user={user}
-            onNavigateHome={() => setCurrentTab('home')}
-            onNavigateAuth={() => setCurrentTab('auth')}
-          />
-        )}
+      {/* Main Pages with AnimatePresence page transitions */}
+      <main className="flex-1 pb-16 md:pb-6">
+        <AnimatePresence mode="wait">
+          {currentTab === 'landing' && (
+            <motion.div
+              key="landing"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
+              <Landing
+                user={user}
+                onNavigateHome={() => setCurrentTab('home')}
+                onNavigateAuth={() => setCurrentTab('auth')}
+              />
+            </motion.div>
+          )}
 
-        {currentTab === 'home' && (
-          <Home
-            favorites={favorites}
-            onRefreshFavorites={fetchFavorites}
-            onOpenTimer={() => setIsTimerOpen(true)}
-            onOpenConverter={() => setIsConverterOpen(true)}
-            onToggleChat={() => setIsChatOpen(!isChatOpen)}
-            onOpenScanner={() => setIsScannerOpen(true)}
-            onOpenAllergens={() => setIsAllergensOpen(true)}
-            onOpenGroceryGap={handleOpenGroceryGap}
-            onPublishCommunity={handlePublishToCommunity}
-            allergenProfile={allergenProfile}
-            isChatOpen={isChatOpen}
-          />
-        )}
+          {currentTab === 'home' && (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
+              <Home
+                favorites={favorites}
+                onRefreshFavorites={fetchFavorites}
+                onOpenTimer={() => setIsTimerOpen(true)}
+                onOpenConverter={() => setIsConverterOpen(true)}
+                onToggleChat={() => setIsChatOpen(!isChatOpen)}
+                onOpenScanner={() => setIsScannerOpen(true)}
+                onOpenAllergens={() => setIsAllergensOpen(true)}
+                onOpenGroceryGap={handleOpenGroceryGap}
+                onPublishCommunity={handlePublishToCommunity}
+                allergenProfile={allergenProfile}
+                isChatOpen={isChatOpen}
+              />
+            </motion.div>
+          )}
 
-        {currentTab === 'community' && (
-          <Community
-            user={user}
-            onSaveToPersonalFavorites={handleSaveToPersonalFavorites}
-          />
-        )}
+          {currentTab === 'community' && (
+            <motion.div
+              key="community"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
+              <Community
+                user={user}
+                onSaveToPersonalFavorites={handleSaveToPersonalFavorites}
+              />
+            </motion.div>
+          )}
 
-        {currentTab === 'favorites' && (
-          <Favorites
-            favorites={favorites}
-            isLoading={isLoadingFavorites}
-            onRefreshFavorites={fetchFavorites}
-            onNavigateHome={() => setCurrentTab('home')}
-          />
-        )}
+          {currentTab === 'favorites' && (
+            <motion.div
+              key="favorites"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
+              <Favorites
+                favorites={favorites}
+                isLoading={isLoadingFavorites}
+                onRefreshFavorites={fetchFavorites}
+                onNavigateHome={() => setCurrentTab('home')}
+              />
+            </motion.div>
+          )}
 
-        {currentTab === 'auth' && (
-          <Auth
-            onAuthSuccess={handleAuthSuccess}
-            onContinueAsGuest={() => setCurrentTab('home')}
-          />
-        )}
+          {currentTab === 'auth' && (
+            <motion.div
+              key="auth"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+            >
+              <Auth
+                onAuthSuccess={handleAuthSuccess}
+                onContinueAsGuest={() => setCurrentTab('home')}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
+
+      {/* Floating Tool Dock (Desktop) & Bottom Tab Bar (Mobile) */}
+      <ToolDock
+        onOpenTimer={() => setIsTimerOpen(true)}
+        onOpenConverter={() => setIsConverterOpen(true)}
+        onOpenScanner={() => setIsScannerOpen(true)}
+        onOpenAllergens={() => setIsAllergensOpen(true)}
+        onToggleChat={() => setIsChatOpen(!isChatOpen)}
+        isChatOpen={isChatOpen}
+      />
 
       {/* Interactive Kitchen Modals */}
       <KitchenTimerModal
@@ -234,40 +308,40 @@ export default function App() {
         onOpen={() => setIsChatOpen(true)}
       />
 
-      {/* Tactile Kitchen Notebook Footer */}
-      <footer className="mt-16 border-t-2 border-[#E3D7BE] bg-[#FAF5E8] py-8 text-center text-xs text-charcoal-muted">
-        <div className="max-w-4xl mx-auto px-4 space-y-2">
-          <div className="flex items-center justify-center gap-1 font-serif text-sm text-charcoal font-bold">
+      {/* Clean modern footer */}
+      <footer className="mt-16 border-t border-paper-border bg-paper py-8 text-center text-xs text-ink-muted">
+        <div className="max-w-4xl mx-auto px-4 space-y-3">
+          <div className="flex items-center justify-center gap-1.5 font-heading text-sm text-ink font-bold">
             <span>PantryChef</span>
             <span className="text-tomato">•</span>
-            <span className="font-handwritten text-base text-sage">A Kitchen Ledger</span>
+            <span className="text-xs text-ink-muted font-normal">Cook with what you have</span>
           </div>
-          <p className="font-sans">
-            Built with MERN Stack, Gemini Vision AI & Framer Motion. Zero food waste, honest home cooking.
+          <p className="text-xs text-ink-muted">
+            Simple home cooking, less grocery waste, better everyday meals.
           </p>
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[11px] font-mono text-charcoal-muted/80">
-            <button onClick={() => setCurrentTab('landing')} className="hover:text-tomato underline">
-              Story
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-xs text-ink-muted">
+            <button onClick={() => setCurrentTab('landing')} className="hover:text-tomato transition-colors cursor-pointer">
+              Home
             </button>
             <span>•</span>
-            <button onClick={() => setCurrentTab('home')} className="hover:text-tomato underline">
-              Kitchen Notebook
+            <button onClick={() => setCurrentTab('home')} className="hover:text-tomato transition-colors cursor-pointer">
+              Pantry
             </button>
             <span>•</span>
-            <button onClick={() => setCurrentTab('community')} className="hover:text-tomato underline">
-              Community Exchange
+            <button onClick={() => setCurrentTab('community')} className="hover:text-tomato transition-colors cursor-pointer">
+              Community
             </button>
             <span>•</span>
-            <button onClick={() => setCurrentTab('favorites')} className="hover:text-tomato underline">
-              Recipe Box ({favorites.length})
+            <button onClick={() => setCurrentTab('favorites')} className="hover:text-tomato transition-colors cursor-pointer">
+              My Recipes ({favorites.length})
             </button>
             <span>•</span>
-            <button onClick={() => setIsScannerOpen(true)} className="hover:text-tomato underline">
+            <button onClick={() => setIsScannerOpen(true)} className="hover:text-tomato transition-colors cursor-pointer">
               Photo Scanner
             </button>
             <span>•</span>
-            <button onClick={() => setIsAllergensOpen(true)} className="hover:text-tomato underline">
-              Allergen Safety
+            <button onClick={() => setIsAllergensOpen(true)} className="hover:text-tomato transition-colors cursor-pointer">
+              Dietary Profile
             </button>
           </div>
         </div>

@@ -53,3 +53,59 @@ export function getCuratedDishPhoto(title = '', description = '', ingredients = 
   }
   return 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=800&q=80';
 }
+
+/**
+ * Return a lively emoji for any kitchen ingredient
+ */
+export function getIngredientEmoji(name = '') {
+  const n = String(name).toLowerCase();
+  if (/egg/i.test(n)) return '🥚';
+  if (/garlic/i.test(n)) return '🧄';
+  if (/onion|shallot/i.test(n)) return '🧅';
+  if (/tomato/i.test(n)) return '🍅';
+  if (/potato/i.test(n)) return '🥔';
+  if (/carrot/i.test(n)) return '🥕';
+  if (/spinach|kale|lettuce|cabbage|greens/i.test(n)) return '🥬';
+  if (/pepper|chili|jalapeno/i.test(n)) return '🫑';
+  if (/mushroom/i.test(n)) return '🍄';
+  if (/broccoli/i.test(n)) return '🥦';
+  if (/cucumber/i.test(n)) return '🥒';
+  if (/corn/i.test(n)) return '🌽';
+  if (/avocado/i.test(n)) return '🥑';
+  if (/lemon|lime/i.test(n)) return '🍋';
+  if (/apple/i.test(n)) return '🍎';
+  if (/banana/i.test(n)) return '🍌';
+  if (/cheese|cheddar|parmesan|mozzarella|feta/i.test(n)) return '🧀';
+  if (/butter/i.test(n)) return '🧈';
+  if (/milk|cream|yogurt/i.test(n)) return '🥛';
+  if (/chicken|poultry/i.test(n)) return '🍗';
+  if (/beef|steak|meat|pork|bacon/i.test(n)) return '🥩';
+  if (/fish|salmon|tuna|seafood|shrimp/i.test(n)) return '🐟';
+  if (/rice/i.test(n)) return '🍚';
+  if (/pasta|spaghetti|penne|noodle/i.test(n)) return '🍝';
+  if (/bread|toast|flour/i.test(n)) return '🍞';
+  if (/bean|lentil|chickpea/i.test(n)) return '🫘';
+  if (/oil|olive/i.test(n)) return '🫒';
+  if (/salt|pepper|spice|herb/i.test(n)) return '🧂';
+  return '🥗';
+}
+
+/**
+ * Categorize ingredient into 5 primary groups
+ */
+export function getIngredientCategory(name = '') {
+  const n = String(name).toLowerCase();
+  if (/milk|cheese|cheddar|parmesan|mozzarella|butter|yogurt|cream|feta/i.test(n)) {
+    return 'Dairy';
+  }
+  if (/chicken|beef|steak|pork|bacon|fish|salmon|tuna|shrimp|egg|tofu|lentil|bean|chickpea|turkey/i.test(n)) {
+    return 'Protein';
+  }
+  if (/rice|pasta|spaghetti|penne|noodle|quinoa|oat|flour|bread|tortilla|couscous/i.test(n)) {
+    return 'Grains';
+  }
+  if (/tomato|onion|garlic|spinach|carrot|potato|pepper|broccoli|mushroom|cucumber|lettuce|zucchini|corn|lemon|lime|avocado|kale|cabbage/i.test(n)) {
+    return 'Vegetables';
+  }
+  return 'Pantry staples';
+}

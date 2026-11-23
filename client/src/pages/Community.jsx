@@ -3,17 +3,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe,
   Search,
-  Sparkles,
   Bookmark,
-  Share2,
   Heart,
   ChefHat,
   Plus,
-  ArrowRight,
-  Flame,
   CheckCircle2,
+  X,
+  Clock,
+  Utensils,
 } from 'lucide-react';
 import { getCommunityRecipes, stampCommunityRecipe, publishCommunityRecipe } from '../api/client';
+import ChefMascot from '../components/ChefMascot';
+import { getCuratedDishPhoto, getIngredientEmoji } from '../utils/foodImageHelper';
+
+const FILTER_TAGS = [
+  'All',
+  'Quick (<20 min)',
+  'Vegetarian',
+  'High-Protein',
+  'Pasta & Rice',
+  'Skillet & Stew',
+];
 
 export default function Community({
   onSaveToPersonalFavorites,
@@ -22,7 +32,8 @@ export default function Community({
   const [recipes, setRecipes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [stampingIds, setStampingIds] = useState({});
+  const [selectedTag, setSelectedTag] = useState('All');
+  const [likedIds, setLikedIds] = useState({});
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [newRecipeData, setNewRecipeData] = useState({
     recipeTitle: '',
@@ -36,7 +47,18 @@ export default function Community({
     try {
       setIsLoading(true);
       const data = await getCommunityRecipes();
-      setRecipes(data || []);
+
+      // De-duplicate by _id, id, and recipeTitle on client
+      const seen = new Set();
+      const unique = [];
+      for (const r of data || []) {
+        const key = String(r._id || r.id || r.recipeTitle).toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(r);
+        }
+      }
+      setRecipes(unique);
     } catch (err) {
       console.error('Error fetching community recipes:', err);
     } finally {
@@ -48,17 +70,23 @@ export default function Community({
     fetchCommunityFeed();
   }, []);
 
-  const handleUpvoteStamp = async (id) => {
-    setStampingIds((prev) => ({ ...prev, [id]: true }));
+  const handleLike = async (id) => {
+    if (!id || likedIds[id]) return;
+    setLikedIds((prev) => ({ ...prev, [id]: true }));
+
+    // Optimistically update like count
+    setRecipes((prev) =>
+      prev.map((r) =>
+        (r._id || r.id) === id
+          ? { ...r, stampsCount: (r.stampsCount || 1) + 1 }
+          : r
+      )
+    );
+
     try {
-      const updated = await stampCommunityRecipe(id);
-      setRecipes((prev) =>
-        prev.map((r) => ((r._id || r.id) === id ? { ...r, stampsCount: (r.stampsCount || 0) + 1 } : r))
-      );
+      await stampCommunityRecipe(id);
     } catch (err) {
-      console.error('Failed to stamp community recipe:', err);
-    } finally {
-      setStampingIds((prev) => ({ ...prev, [id]: false }));
+      console.error('Failed to register like:', err);
     }
   };
 
@@ -70,6 +98,8 @@ export default function Community({
 
   const handleCreateCommunityRecipe = async (e) => {
     e.preventDefault();
+    if (!newRecipeData.recipeTitle.trim()) return;
+
     try {
       const ingredientsArray = newRecipeData.ingredients
         .split(',')
@@ -81,7 +111,7 @@ export default function Community({
         .filter(Boolean);
 
       await publishCommunityRecipe({
-        authorName: user?.name || 'Home Chef',
+        authorName: user?.name || 'Home Cook',
         authorTitle: user?.chefTitle || 'Pantry Explorer',
         recipeTitle: newRecipeData.recipeTitle,
         recipeDescription: newRecipeData.recipeDescription,
@@ -97,168 +127,244 @@ export default function Community({
         recipeSteps: '',
       });
       fetchCommunityFeed();
-      setPublishFeedback('Recipe successfully published to the Community Ledger!');
+      setPublishFeedback('Recipe successfully shared with the community!');
       setTimeout(() => setPublishFeedback(null), 4000);
     } catch (err) {
       console.error('Publish error:', err);
     }
   };
 
+  // Filter recipes by search query and tag
   const filtered = recipes.filter((r) => {
     const term = searchTerm.toLowerCase();
-    return (
+    const matchesSearch =
       (r.recipeTitle || '').toLowerCase().includes(term) ||
       (r.recipeDescription || '').toLowerCase().includes(term) ||
       (r.authorName || '').toLowerCase().includes(term) ||
-      (r.ingredients || []).some((i) => i.toLowerCase().includes(term))
-    );
+      (r.ingredients || []).some((i) => i.toLowerCase().includes(term));
+
+    if (!matchesSearch) return false;
+
+    if (selectedTag === 'All') return true;
+    const fullText = `${r.recipeTitle} ${r.recipeDescription} ${(r.ingredients || []).join(' ')}`.toLowerCase();
+
+    if (selectedTag === 'Quick (<20 min)') {
+      return fullText.includes('quick') || fullText.includes('15') || fullText.includes('10') || fullText.includes('20');
+    }
+    if (selectedTag === 'Vegetarian') {
+      return !/chicken|beef|meat|pork|bacon|fish|salmon|tuna|shrimp/.test(fullText);
+    }
+    if (selectedTag === 'High-Protein') {
+      return /chicken|beef|egg|protein|bean|lentil|salmon|tofu/.test(fullText);
+    }
+    if (selectedTag === 'Pasta & Rice') {
+      return /pasta|rice|noodle|spaghetti|risotto/.test(fullText);
+    }
+    if (selectedTag === 'Skillet & Stew') {
+      return /skillet|stew|soup|simmer|sear|frittata/.test(fullText);
+    }
+    return true;
   });
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-[#E3D7BE]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-paper-border">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mustard/20 border border-mustard/40 text-charcoal text-xs font-mono font-bold uppercase tracking-wider mb-2">
-            <Globe className="w-3.5 h-3.5 text-mustard" /> Public Recipe Exchange
-          </div>
-          <h1 className="font-serif text-3xl sm:text-4xl font-extrabold text-charcoal tracking-tight">
-            The Community Ledger
+          <h1 className="font-heading text-3xl sm:text-4xl font-extrabold text-ink tracking-tight flex items-center gap-3">
+            <Globe className="w-8 h-8 text-butter" />
+            <span>Community Recipes</span>
           </h1>
-          <p className="text-xs sm:text-sm text-charcoal-muted font-sans mt-1">
-            Discover and stamp crowd-favorite pantry dishes shared by fellow home cooks.
+          <p className="text-sm text-ink-muted mt-1">
+            Discover and share favorite pantry creations with other home cooks.
           </p>
         </div>
 
         <button
           type="button"
           onClick={() => setIsShareModalOpen(true)}
-          className="self-start sm:self-auto px-5 py-3 bg-tomato hover:bg-tomato-hover text-white rounded-xl font-serif font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 border border-[#A83E1E]"
+          className="self-start sm:self-auto px-5 py-2.5 bg-tomato hover:bg-tomato-hover text-white rounded-btn font-semibold text-sm shadow-sm transition-all flex items-center gap-2 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>Publish a Recipe Card</span>
+          <span>Share a Recipe</span>
         </button>
       </div>
 
       {/* Feedback Toast */}
       {publishFeedback && (
-        <div className="p-3.5 rounded-xl bg-sage/20 border border-sage/40 text-sage-hover font-medium text-xs sm:text-sm flex items-center gap-2">
+        <div className="p-3.5 rounded-btn bg-basil/15 border border-basil/30 text-basil font-medium text-sm flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           <span>{publishFeedback}</span>
         </div>
       )}
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-charcoal-muted" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search community recipes by title, ingredients, or chef author..."
-          className="w-full bg-[#FAF5E8] text-charcoal placeholder-charcoal-muted/60 pl-11 pr-4 py-3 rounded-xl border-2 border-[#E3D7BE] focus:outline-none focus:border-sage font-medium text-sm transition-all"
-        />
+      {/* Search & Filter Bar */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search community recipes by title, ingredients, or cook name..."
+            className="w-full bg-paper text-ink placeholder-ink-muted/60 pl-11 pr-4 py-3 rounded-btn border border-paper-border focus:outline-none focus:border-tomato text-sm font-medium transition-all shadow-sm"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-ink-muted hover:text-tomato underline cursor-pointer"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Filter Chips */}
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
+          {FILTER_TAGS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setSelectedTag(tag)}
+              className={`text-xs px-3.5 py-1.5 rounded-full font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                selectedTag === tag
+                  ? 'bg-ink text-paper shadow-sm'
+                  : 'bg-paper text-ink-muted hover:text-ink border border-paper-border'
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Feed Cards Grid */}
       {isLoading ? (
-        <div className="py-16 text-center">
-          <div className="animate-spin w-8 h-8 border-3 border-tomato border-t-transparent rounded-full mx-auto mb-3" />
-          <p className="font-serif text-charcoal font-medium">Opening community recipe ledger...</p>
+        <div className="py-16 text-center space-y-3">
+          <div className="animate-spin w-8 h-8 border-3 border-tomato border-t-transparent rounded-full mx-auto" />
+          <p className="font-medium text-ink">Loading community recipes...</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-[#FAF5E8] border-2 border-dashed border-[#D9CBAC] rounded-2xl p-10 text-center space-y-3">
-          <ChefHat className="w-10 h-10 text-charcoal-muted mx-auto" />
-          <h3 className="font-serif font-bold text-lg text-charcoal">
-            No community recipes matched "{searchTerm}"
-          </h3>
-          <p className="text-xs text-charcoal-muted font-sans">
-            Be the first to publish a pantry hack recipe to the community exchange!
-          </p>
+        <div className="bg-paper-card border border-dashed border-paper-border rounded-card p-10 text-center space-y-4">
+          <ChefMascot mood="idle" size={90} className="mx-auto" />
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="font-heading font-bold text-lg text-ink">
+              {searchTerm ? `No community recipes matched "${searchTerm}"` : 'No community recipes yet'}
+            </h3>
+            <p className="text-sm text-ink-muted">
+              {searchTerm
+                ? 'Try a different search word or clear the filter to browse all recipes.'
+                : 'Be the first home cook to share a delicious pantry creation!'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (searchTerm) setSearchTerm('');
+              else setIsShareModalOpen(true);
+            }}
+            className="px-6 py-2.5 bg-tomato hover:bg-tomato-hover text-white font-semibold text-sm rounded-btn transition-colors cursor-pointer"
+          >
+            {searchTerm ? 'Clear search filter' : 'Share a recipe'}
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((r, index) => {
             const id = r._id || r.id;
-            const isStamping = !!stampingIds[id];
+            const photoUrl = getCuratedDishPhoto(r.recipeTitle, r.recipeDescription, r.ingredients);
+            const likesCount = r.stampsCount || 1;
+            const isLiked = !!likedIds[id];
+
             return (
               <motion.div
                 key={id || index}
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="index-card rounded-2xl p-6 bg-[#FAF7EE] border border-[#E4D7BF] shadow-card-soft flex flex-col justify-between space-y-4 relative group"
+                className="card-base overflow-hidden flex flex-col justify-between group hover:shadow-card-elevated"
               >
-                {/* Red Top Stripe */}
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-tomato/50 rounded-t-2xl" />
+                {/* Recipe Photography Header */}
+                <div className="relative h-44 w-full bg-paper-muted overflow-hidden">
+                  <img
+                    src={photoUrl}
+                    alt={r.recipeTitle}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
 
-                <div className="space-y-3">
-                  {/* Author Badge */}
-                  <div className="flex items-center justify-between border-b border-[#EFE5D1] pb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-tomato/15 text-tomato flex items-center justify-center font-serif text-xs font-bold">
-                        {r.authorName?.[0] || 'C'}
-                      </div>
-                      <div>
-                        <span className="font-serif font-bold text-xs text-charcoal block leading-none">
-                          {r.authorName || 'Home Cook'}
-                        </span>
-                        <span className="text-[10px] font-mono text-charcoal-muted">
-                          {r.authorTitle || 'Pantry Cook'}
-                        </span>
-                      </div>
-                    </div>
+                  {/* Like Button on Image */}
+                  <button
+                    type="button"
+                    onClick={() => handleLike(id)}
+                    aria-label={`Like this recipe, current likes: ${likesCount}`}
+                    className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 backdrop-blur-md shadow-sm transition-all cursor-pointer ${
+                      isLiked
+                        ? 'bg-tomato text-white'
+                        : 'bg-paper/90 text-ink hover:bg-paper'
+                    }`}
+                  >
+                    <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-white text-white' : 'text-tomato'}`} />
+                    <span>{likesCount}</span>
+                  </button>
 
-                    {/* Community Upvote Stamp Badge */}
-                    <button
-                      type="button"
-                      onClick={() => handleUpvoteStamp(id)}
-                      disabled={isStamping}
-                      className="flex items-center gap-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-tomato/10 text-tomato hover:bg-tomato/20 border border-tomato/30 transition-colors"
-                      title="Stamp this community recipe"
-                    >
-                      <Flame className="w-3.5 h-3.5 text-mustard" />
-                      <span>{r.stampsCount || 1} Stamps</span>
-                    </button>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="font-serif text-lg font-bold text-charcoal group-hover:text-tomato transition-colors">
-                    {r.recipeTitle}
-                  </h3>
-
-                  {/* Description */}
-                  <p className="text-xs text-charcoal/80 font-sans leading-relaxed">
-                    {r.recipeDescription}
-                  </p>
-
-                  {/* Ingredients */}
-                  <div className="flex flex-wrap gap-1">
-                    {(r.ingredients || []).map((ing, i) => (
-                      <span
-                        key={i}
-                        className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#F4ECDB] text-charcoal-muted border border-[#E2D4BD]"
-                      >
-                        {ing}
-                      </span>
-                    ))}
+                  {/* Author Name on bottom of photo */}
+                  <div className="absolute bottom-2.5 left-3 text-white">
+                    <span className="text-xs font-bold block leading-none drop-shadow">
+                      {r.authorName || 'Home Cook'}
+                    </span>
+                    <span className="text-[10px] text-white/80 drop-shadow">
+                      {r.authorTitle || 'Pantry Cook'}
+                    </span>
                   </div>
                 </div>
 
-                {/* Import CTA Button */}
-                <div className="pt-3 border-t border-[#EFE5D1] flex items-center justify-between">
-                  <span className="text-[11px] font-mono text-sage-hover font-semibold">
-                    {(r.recipeSteps || []).length} Cooking Steps
-                  </span>
+                {/* Card Body */}
+                <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <h3 className="font-heading text-lg font-bold text-ink group-hover:text-tomato transition-colors line-clamp-1">
+                      {r.recipeTitle}
+                    </h3>
+                    <p className="text-xs text-ink-muted leading-relaxed line-clamp-2">
+                      {r.recipeDescription}
+                    </p>
 
-                  <button
-                    type="button"
-                    onClick={() => handleImportToFavorites(r)}
-                    className="px-3 py-1.5 rounded-xl bg-tomato hover:bg-tomato-hover text-white text-xs font-serif font-bold transition-all shadow-sm flex items-center gap-1.5"
-                  >
-                    <Bookmark className="w-3.5 h-3.5" />
-                    <span>Stamp to My Box</span>
-                  </button>
+                    {/* Ingredients Used Chips with Emojis */}
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {(r.ingredients || []).slice(0, 5).map((ing, i) => (
+                        <span
+                          key={i}
+                          className="text-[11px] px-2 py-0.5 rounded-full bg-paper text-ink border border-paper-border flex items-center gap-1"
+                        >
+                          <span>{getIngredientEmoji(ing)}</span>
+                          <span>{ing}</span>
+                        </span>
+                      ))}
+                      {(r.ingredients || []).length > 5 && (
+                        <span className="text-[10px] text-ink-muted px-1.5 py-0.5">
+                          +{(r.ingredients || []).length - 5} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer Action: Steps count & Save to My Recipes */}
+                  <div className="pt-3 border-t border-paper-border flex items-center justify-between mt-3">
+                    <span className="text-xs text-ink-muted flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-basil" />
+                      <span>{(r.recipeSteps || []).length} steps</span>
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleImportToFavorites(r)}
+                      className="px-3 py-1.5 rounded-btn bg-paper hover:bg-tomato hover:text-white text-ink border border-paper-border text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <Bookmark className="w-3.5 h-3.5" />
+                      <span>Save recipe</span>
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             );
@@ -266,33 +372,35 @@ export default function Community({
         </div>
       )}
 
-      {/* Publish Modal */}
+      {/* Share / Publish Modal */}
       {isShareModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm">
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
+            initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="w-full max-w-lg bg-[#FAF5E8] border-2 border-[#D9CBAC] rounded-3xl p-6 sm:p-7 shadow-card-elevated relative max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-lg bg-paper-card border border-paper-border rounded-card p-6 sm:p-7 shadow-card-elevated relative max-h-[90vh] overflow-y-auto space-y-4"
           >
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#E4D7BF]">
+            <div className="flex items-center justify-between pb-3 border-b border-paper-border">
               <div className="flex items-center gap-2">
                 <ChefHat className="w-5 h-5 text-tomato" />
-                <h3 className="font-serif text-lg font-bold text-charcoal">
-                  Publish to Community Ledger
+                <h3 className="font-heading text-lg font-bold text-ink">
+                  Share a Recipe with the Community
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsShareModalOpen(false)}
-                className="p-1.5 rounded-lg text-charcoal-muted hover:text-tomato"
+                className="p-1 rounded-full text-ink-muted hover:text-ink cursor-pointer"
+                aria-label="Close modal"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCommunityRecipe} className="space-y-3.5">
+            <form onSubmit={handleCreateCommunityRecipe} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-charcoal-muted font-bold mb-1">
-                  Recipe Title:
+                <label className="block text-xs font-semibold text-ink mb-1">
+                  Recipe Title *
                 </label>
                 <input
                   type="text"
@@ -301,67 +409,72 @@ export default function Community({
                   onChange={(e) =>
                     setNewRecipeData({ ...newRecipeData, recipeTitle: e.target.value })
                   }
-                  placeholder="e.g. Crispy Garlic Butter Rice Bowl"
-                  className="w-full bg-[#FBF7EE] text-charcoal px-3.5 py-2.5 rounded-xl border border-[#D9CBAC] text-sm focus:outline-none focus:border-tomato font-medium"
+                  placeholder="e.g. Grandma's 10-Minute Potato Frittata"
+                  className="w-full bg-paper text-ink px-3.5 py-2.5 rounded-btn border border-paper-border text-sm focus:outline-none focus:border-tomato"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-charcoal-muted font-bold mb-1">
-                  Appetizing Description:
+                <label className="block text-xs font-semibold text-ink mb-1">
+                  Description
                 </label>
                 <textarea
                   rows={2}
-                  required
                   value={newRecipeData.recipeDescription}
                   onChange={(e) =>
                     setNewRecipeData({ ...newRecipeData, recipeDescription: e.target.value })
                   }
-                  placeholder="One sentence describing the dish and pantry staples utilized..."
-                  className="w-full bg-[#FBF7EE] text-charcoal px-3.5 py-2.5 rounded-xl border border-[#D9CBAC] text-xs sm:text-sm focus:outline-none focus:border-tomato font-medium"
+                  placeholder="Brief note on what makes this dish delicious or easy..."
+                  className="w-full bg-paper text-ink px-3.5 py-2 rounded-btn border border-paper-border text-sm focus:outline-none focus:border-tomato resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-charcoal-muted font-bold mb-1">
-                  Key Ingredients (comma-separated):
+                <label className="block text-xs font-semibold text-ink mb-1">
+                  Ingredients (comma separated)
                 </label>
                 <input
                   type="text"
-                  required
                   value={newRecipeData.ingredients}
                   onChange={(e) =>
                     setNewRecipeData({ ...newRecipeData, ingredients: e.target.value })
                   }
-                  placeholder="e.g. Rice, Garlic, Butter, Spinach, Eggs"
-                  className="w-full bg-[#FBF7EE] text-charcoal px-3.5 py-2.5 rounded-xl border border-[#D9CBAC] text-xs sm:text-sm focus:outline-none focus:border-tomato font-medium"
+                  placeholder="Eggs, Potatoes, Onion, Olive Oil, Salt"
+                  className="w-full bg-paper text-ink px-3.5 py-2.5 rounded-btn border border-paper-border text-sm focus:outline-none focus:border-tomato"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-charcoal-muted font-bold mb-1">
-                  Preparation Steps (one per line):
+                <label className="block text-xs font-semibold text-ink mb-1">
+                  Preparation Steps (one step per line)
                 </label>
                 <textarea
                   rows={4}
-                  required
                   value={newRecipeData.recipeSteps}
                   onChange={(e) =>
                     setNewRecipeData({ ...newRecipeData, recipeSteps: e.target.value })
                   }
-                  placeholder="Melt butter with garlic in a wide pan&#10;Add cooked rice and press flat for crispness&#10;Toss in spinach and season with soy sauce"
-                  className="w-full bg-[#FBF7EE] text-charcoal px-3.5 py-2.5 rounded-xl border border-[#D9CBAC] text-xs sm:text-sm focus:outline-none focus:border-tomato font-mono"
+                  placeholder="1. Slice potatoes into thin coins&#10;2. Brown onions in olive oil&#10;3. Pour whisked eggs over and cook until set"
+                  className="w-full bg-paper text-ink px-3.5 py-2 rounded-btn border border-paper-border text-sm focus:outline-none focus:border-tomato resize-none font-sans"
                 />
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                className="w-full py-3 bg-tomato hover:bg-tomato-hover text-white font-serif font-bold text-sm rounded-xl shadow-md transition-all mt-2"
-              >
-                Publish to Public Exchange
-              </motion.button>
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-ink-muted hover:text-ink cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newRecipeData.recipeTitle.trim()}
+                  className="px-5 py-2.5 bg-tomato hover:bg-tomato-hover disabled:opacity-40 text-white rounded-btn text-xs font-semibold shadow-sm transition-all cursor-pointer"
+                >
+                  Publish Recipe
+                </button>
+              </div>
             </form>
           </motion.div>
         </div>

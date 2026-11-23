@@ -37,11 +37,21 @@ function playChime() {
   }
 }
 
-export default function KitchenTimerModal({ isOpen, onClose }) {
+export default function KitchenTimerModal({ isOpen, onClose, initialMinutes = null }) {
   const [timeLeft, setTimeLeft] = useState(300); // default 5m
   const [initialTime, setInitialTime] = useState(300);
   const [isRunning, setIsRunning] = useState(false);
   const [timerLabel, setTimerLabel] = useState('5 min (Simmer)');
+
+  useEffect(() => {
+    if (isOpen && initialMinutes && initialMinutes > 0) {
+      const secs = initialMinutes * 60;
+      setTimeLeft(secs);
+      setInitialTime(secs);
+      setTimerLabel(`${initialMinutes} min timer`);
+      setIsRunning(true);
+    }
+  }, [isOpen, initialMinutes]);
 
   useEffect(() => {
     let interval = null;

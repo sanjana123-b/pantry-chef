@@ -82,13 +82,28 @@ const MongooseCommunityRecipe = mongoose.model('CommunityRecipe', communityRecip
 
 export const CommunityRepository = {
   async getAll() {
+    let list = [];
     if (isDBConnected()) {
       const docs = await MongooseCommunityRecipe.find().sort({ stampsCount: -1, createdAt: -1 });
-      if (docs.length > 0) return docs;
+      if (docs.length > 0) {
+        list = docs;
+      }
     }
-    return Array.from(memoryCommunityStore.values()).sort(
-      (a, b) => b.stampsCount - a.stampsCount || new Date(b.createdAt) - new Date(a.createdAt)
-    );
+    if (list.length === 0) {
+      list = Array.from(memoryCommunityStore.values()).sort(
+        (a, b) => b.stampsCount - a.stampsCount || new Date(b.createdAt) - new Date(a.createdAt)
+      );
+    }
+
+    // De-duplicate by unique _id, id, and recipeTitle to prevent duplicate renders
+    const seen = new Map();
+    for (const item of list) {
+      const key = String(item._id || item.id || item.recipeTitle).toLowerCase();
+      if (!seen.has(key)) {
+        seen.set(key, item);
+      }
+    }
+    return Array.from(seen.values());
   },
 
   async create(data) {

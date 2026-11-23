@@ -6,7 +6,19 @@ const router = express.Router();
 // GET /api/community - Retrieve community recipes
 router.get('/community', async (req, res) => {
   try {
-    const recipes = await CommunityRepository.getAll();
+    const rawRecipes = await CommunityRepository.getAll();
+
+    // De-duplicate on the server by _id and recipeTitle
+    const seen = new Set();
+    const recipes = [];
+    for (const r of rawRecipes) {
+      const key = String(r._id || r.id || r.recipeTitle).toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        recipes.push(r);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       recipes,

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquareText, Send, X, Bot, User, Sparkles, ChefHat, RotateCcw } from 'lucide-react';
+import { MessageSquareText, Send, X, Bot, User, Sparkles, ChefHat, RotateCcw, AlertCircle } from 'lucide-react';
 import { askSousChef } from '../api/client';
+import ChefMascot from './ChefMascot';
 
 const STARTER_PROMPTS = [
   '🧂 How to fix an over-salted sauce?',
@@ -16,6 +17,7 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
     {
       sender: 'bot',
       text: "👋 Bonjour! I'm **Chef Auguste**, your culinary sous-chef. Got a missing ingredient, an over-salted skillet, or need a quick culinary fix? Ask me anything!",
+      source: 'gemini',
     },
   ]);
   const [inputText, setInputText] = useState('');
@@ -26,7 +28,7 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isOpen]);
+  }, [messages, isLoading, isOpen]);
 
   const handleSend = async (customText) => {
     const textToSend = customText || inputText;
@@ -38,14 +40,23 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
     setIsLoading(true);
 
     try {
-      const reply = await askSousChef(textToSend.trim(), messages);
-      setMessages((prev) => [...prev, { sender: 'bot', text: reply }]);
+      const response = await askSousChef(textToSend.trim(), messages);
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: 'bot',
+          text: response.reply,
+          source: response.source || 'gemini',
+        },
+      ]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           sender: 'bot',
-          text: "⚠️ Chef Auguste had to adjust the stovetop flame. Please try asking your question again!",
+          text: `⚠️ **Unable to reach Chef Auguste:** ${err.message || 'Please check your connection and try asking again.'}`,
+          isError: true,
+          source: 'fallback',
         },
       ]);
     } finally {
@@ -58,6 +69,7 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
       {
         sender: 'bot',
         text: "👋 Kitchen slate cleared! What cooking advice or substitution can I help you with next?",
+        source: 'gemini',
       },
     ]);
   };
@@ -98,20 +110,20 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
             <div className="h-2 bg-tomato/80 w-full" />
 
             {/* Chatbot Header */}
-            <div className="p-4 bg-[#F5EDDD] border-b border-[#E3D6BC] flex items-center justify-between">
+            <div className="p-3.5 bg-paper-card border-b border-paper-border flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-tomato text-white flex items-center justify-center shadow-sm">
-                  <ChefHat className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-tomato/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <ChefMascot mood={isLoading ? "thinking" : "idle"} size={36} />
                 </div>
                 <div>
-                  <h3 className="font-serif font-bold text-base text-charcoal flex items-center gap-1.5">
+                  <h3 className="font-heading font-bold text-base text-ink flex items-center gap-1.5">
                     Chef Auguste
-                    <span className="text-[10px] font-mono font-bold bg-sage/20 text-sage-hover px-1.5 py-0.5 rounded border border-sage/30">
-                      AI SOUS-CHEF
+                    <span className="text-[10px] font-semibold bg-basil/15 text-basil px-2 py-0.5 rounded-full">
+                      Sous-Chef
                     </span>
                   </h3>
-                  <p className="text-[11px] font-handwritten text-charcoal-muted -mt-0.5">
-                    Your personal kitchen advisor
+                  <p className="text-xs text-ink-muted -mt-0.5">
+                    {isLoading ? "Thinking about cooking..." : "Your kitchen advisor"}
                   </p>
                 </div>
               </div>
@@ -120,16 +132,18 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="p-1.5 rounded-lg text-charcoal-muted hover:text-charcoal hover:bg-[#EAE0CD] transition-colors"
+                  className="p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-paper-muted transition-colors cursor-pointer"
                   title="Clear conversation"
+                  aria-label="Clear conversation"
                 >
                   <RotateCcw className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1.5 rounded-lg text-charcoal-muted hover:text-tomato hover:bg-tomato/10 transition-colors"
+                  className="p-1.5 rounded-lg text-ink-muted hover:text-tomato hover:bg-tomato/10 transition-colors cursor-pointer"
                   title="Close Sous-Chef"
+                  aria-label="Close chat"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -155,10 +169,18 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
                     className={`max-w-[82%] p-3 rounded-2xl text-xs sm:text-sm leading-relaxed ${
                       msg.sender === 'user'
                         ? 'bg-tomato text-white rounded-br-none shadow-sm'
+                        : msg.isError
+                        ? 'bg-red-50 text-red-900 border border-red-200 rounded-bl-none shadow-sm whitespace-pre-wrap'
                         : 'bg-[#FBF7EE] text-charcoal rounded-bl-none border border-[#DECFA4] shadow-sm whitespace-pre-wrap'
                     }`}
                   >
-                    {msg.text}
+                    <div>{msg.text}</div>
+                    {msg.sender === 'bot' && msg.source === 'fallback' && !msg.isError && (
+                      <div className="mt-2 pt-1.5 border-t border-[#DECFA4]/60 flex items-center gap-1.5 text-[10px] text-amber-800 font-medium">
+                        <AlertCircle className="w-3 h-3 text-amber-600 flex-shrink-0" />
+                        <span>Offline tips mode</span>
+                      </div>
+                    )}
                   </div>
 
                   {msg.sender === 'user' && (
@@ -171,13 +193,17 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
 
               {isLoading && (
                 <div className="flex gap-2.5 justify-start">
-                  <div className="w-7 h-7 rounded-lg bg-tomato/15 text-tomato flex items-center justify-center flex-shrink-0 border border-tomato/20">
-                    <ChefHat className="w-4 h-4" />
+                  <div className="w-8 h-8 rounded-full bg-tomato/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <ChefMascot mood="thinking" size={28} />
                   </div>
-                  <div className="bg-[#FBF7EE] border border-[#DECFA4] p-3 rounded-2xl rounded-bl-none text-xs text-charcoal-muted flex items-center gap-2 shadow-sm">
-                    <span className="w-2 h-2 rounded-full bg-tomato animate-ping" />
-                    <span className="font-handwritten text-sm text-charcoal font-bold">
-                      Chef Auguste is reviewing the ledger...
+                  <div className="bg-paper-card border border-paper-border px-3.5 py-2.5 rounded-card rounded-bl-none text-xs text-ink flex items-center gap-2.5 shadow-sm">
+                    <div className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-tomato animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-tomato animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-tomato animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-xs text-ink-muted font-medium">
+                      Chef Auguste is thinking...
                     </span>
                   </div>
                 </div>
@@ -191,8 +217,9 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
                 <button
                   key={pIdx}
                   type="button"
+                  disabled={isLoading}
                   onClick={() => handleSend(prompt)}
-                  className="flex-shrink-0 text-[11px] font-sans px-2.5 py-1 rounded-full bg-[#F4ECDB] hover:bg-tomato/15 hover:text-tomato text-charcoal border border-[#DDD2BE] transition-colors"
+                  className="flex-shrink-0 text-[11px] font-sans px-2.5 py-1 rounded-full bg-[#F4ECDB] hover:bg-tomato/15 hover:text-tomato text-charcoal border border-[#DDD2BE] transition-colors disabled:opacity-50"
                 >
                   {prompt}
                 </button>
@@ -210,14 +237,16 @@ export default function ChatbotDrawer({ isOpen, onClose, onOpen }) {
               <input
                 type="text"
                 value={inputText}
+                disabled={isLoading}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Ask Chef Auguste anything..."
-                className="flex-1 bg-[#FBF7EE] text-charcoal placeholder-charcoal-muted/60 px-3.5 py-2.5 rounded-xl border border-[#D9CBAC] text-xs sm:text-sm focus:outline-none focus:border-tomato font-medium"
+                placeholder={isLoading ? "Chef is writing..." : "Ask Chef Auguste anything..."}
+                className="flex-1 bg-[#FBF7EE] text-charcoal placeholder-charcoal-muted/60 px-3.5 py-2.5 rounded-xl border border-[#D9CBAC] text-xs sm:text-sm focus:outline-none focus:border-tomato font-medium disabled:opacity-60"
               />
               <button
                 type="submit"
                 disabled={!inputText.trim() || isLoading}
-                className="p-2.5 bg-tomato hover:bg-tomato-hover disabled:opacity-40 text-white rounded-xl shadow-sm transition-all flex items-center justify-center"
+                className="p-2.5 bg-tomato hover:bg-tomato-hover disabled:opacity-40 text-white rounded-xl shadow-sm transition-all flex items-center justify-center cursor-pointer disabled:cursor-not-allowed"
+                aria-label="Send message"
               >
                 <Send className="w-4 h-4" />
               </button>
