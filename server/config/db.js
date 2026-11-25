@@ -11,7 +11,7 @@ export const connectDB = async () => {
       serverSelectionTimeoutMS: 1500,
     });
     isConnected = true;
-    console.log(`[Database] Connected to MongoDB at: ${uri}`);
+    console.log("[Database] Connected to MongoDB");
   } catch (err) {
     isConnected = false;
     console.warn(`[Database] Local/remote MongoDB is offline (${err.message}).`);
