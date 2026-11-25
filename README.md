@@ -1,5 +1,8 @@
 # 🍲 PantryChef — AI-Powered Kitchen Recipe Ledger
 
+**🔗 Live Demo:** https://pantrychef-br0t.onrender.com  
+**💻 Source:** https://github.com/sanjana123-b/pantry-chef
+
 An AI-powered **"Cook with What You Have"** web application that helps users discover recipes using ingredients already available in their kitchen.
 
 PantryChef combines AI-powered recipe generation with a warm, interactive kitchen notebook experience. Instead of a conventional AI-wrapper interface, it features a tactile cookbook-inspired design with animated recipe cards, ingredient tags, and a personal Recipe Box.
