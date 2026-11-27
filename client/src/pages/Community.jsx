@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Globe,
   Search,
@@ -14,16 +14,25 @@ import {
 } from 'lucide-react';
 import { getCommunityRecipes, stampCommunityRecipe, publishCommunityRecipe } from '../api/client';
 import ChefMascot from '../components/ChefMascot';
-import { getCuratedDishPhoto, getIngredientEmoji } from '../utils/foodImageHelper';
+import { getIngredientEmoji } from '../utils/foodImageHelper';
 
 const FILTER_TAGS = [
-  'All',
-  'Quick (<20 min)',
-  'Vegetarian',
-  'High-Protein',
-  'Pasta & Rice',
-  'Skillet & Stew',
+  { label: 'All', tags: [] },
+  { label: 'Indian', tags: ['indian'] },
+  { label: 'Quick (<20 min)', tags: ['quick'] },
+  { label: 'Vegetarian', tags: ['vegetarian'] },
+  { label: 'High-Protein', tags: ['high-protein'] },
+  { label: 'Curries & Dal', tags: ['curries'] },
+  { label: 'Rice & Pulao', tags: ['rice'] },
+  { label: 'Breakfast', tags: ['breakfast'] },
+  { label: 'Skillet & Stew', tags: ['skillet', 'stew'] },
+  { label: 'Sweets', tags: ['sweets'] },
 ];
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: { opacity: 1, y: 0 },
+};
 
 export default function Community({
   onSaveToPersonalFavorites,
@@ -134,36 +143,17 @@ export default function Community({
     }
   };
 
-  // Filter recipes by search query and tag
+  const activeFilter = FILTER_TAGS.find((filter) => filter.label === selectedTag);
   const filtered = recipes.filter((r) => {
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.trim().toLowerCase();
     const matchesSearch =
       (r.recipeTitle || '').toLowerCase().includes(term) ||
-      (r.recipeDescription || '').toLowerCase().includes(term) ||
       (r.authorName || '').toLowerCase().includes(term) ||
-      (r.ingredients || []).some((i) => i.toLowerCase().includes(term));
-
-    if (!matchesSearch) return false;
-
-    if (selectedTag === 'All') return true;
-    const fullText = `${r.recipeTitle} ${r.recipeDescription} ${(r.ingredients || []).join(' ')}`.toLowerCase();
-
-    if (selectedTag === 'Quick (<20 min)') {
-      return fullText.includes('quick') || fullText.includes('15') || fullText.includes('10') || fullText.includes('20');
-    }
-    if (selectedTag === 'Vegetarian') {
-      return !/chicken|beef|meat|pork|bacon|fish|salmon|tuna|shrimp/.test(fullText);
-    }
-    if (selectedTag === 'High-Protein') {
-      return /chicken|beef|egg|protein|bean|lentil|salmon|tofu/.test(fullText);
-    }
-    if (selectedTag === 'Pasta & Rice') {
-      return /pasta|rice|noodle|spaghetti|risotto/.test(fullText);
-    }
-    if (selectedTag === 'Skillet & Stew') {
-      return /skillet|stew|soup|simmer|sear|frittata/.test(fullText);
-    }
-    return true;
+      (r.ingredients || []).some((ingredient) => ingredient.toLowerCase().includes(term));
+    const recipeTags = (r.tags || []).map((tag) => tag.toLowerCase());
+    const matchesTag = !activeFilter?.tags.length ||
+      activeFilter.tags.some((tag) => recipeTags.includes(tag));
+    return matchesSearch && matchesTag;
   });
 
   return (
@@ -221,24 +211,29 @@ export default function Community({
 
         {/* Filter Chips */}
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
-          {FILTER_TAGS.map((tag) => (
+          {FILTER_TAGS.map(({ label }) => (
             <button
-              key={tag}
+              key={label}
               type="button"
-              onClick={() => setSelectedTag(tag)}
+              onClick={() => setSelectedTag(label)}
               className={`text-xs px-3.5 py-1.5 rounded-full font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                selectedTag === tag
+                selectedTag === label
                   ? 'bg-ink text-paper shadow-sm'
                   : 'bg-paper text-ink-muted hover:text-ink border border-paper-border'
               }`}
             >
-              {tag}
+              {label}
             </button>
           ))}
         </div>
       </div>
 
       {/* Feed Cards Grid */}
+      {!isLoading && (
+        <p className="text-sm text-ink-muted" aria-live="polite">
+          Showing {filtered.length} of {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'}
+        </p>
+      )}
       {isLoading ? (
         <div className="py-16 text-center space-y-3">
           <div className="animate-spin w-8 h-8 border-3 border-tomato border-t-transparent rounded-full mx-auto" />
@@ -249,40 +244,40 @@ export default function Community({
           <ChefMascot mood="idle" size={90} className="mx-auto" />
           <div className="space-y-1 max-w-md mx-auto">
             <h3 className="font-heading font-bold text-lg text-ink">
-              {searchTerm ? `No community recipes matched "${searchTerm}"` : 'No community recipes yet'}
+              No recipes match. Try Indian or Quick.
             </h3>
-            <p className="text-sm text-ink-muted">
-              {searchTerm
-                ? 'Try a different search word or clear the filter to browse all recipes.'
-                : 'Be the first home cook to share a delicious pantry creation!'}
-            </p>
           </div>
           <button
             type="button"
             onClick={() => {
               if (searchTerm) setSearchTerm('');
-              else setIsShareModalOpen(true);
+              if (selectedTag !== 'All') setSelectedTag('All');
             }}
             className="px-6 py-2.5 bg-tomato hover:bg-tomato-hover text-white font-semibold text-sm rounded-btn transition-colors cursor-pointer"
           >
-            {searchTerm ? 'Clear search filter' : 'Share a recipe'}
+            Clear filters
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <>
+          <motion.div
+            key={`${selectedTag}-${searchTerm}`}
+            initial="hidden"
+            animate="visible"
+            variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch"
+          >
           {filtered.map((r, index) => {
             const id = r._id || r.id;
-            const photoUrl = getCuratedDishPhoto(r.recipeTitle, r.recipeDescription, r.ingredients);
+            const photoUrl = r.imagePath || '/images/fallback.jpg';
             const likesCount = r.stampsCount || 1;
             const isLiked = !!likedIds[id];
 
             return (
               <motion.div
                 key={id || index}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="card-base overflow-hidden flex flex-col justify-between group hover:shadow-card-elevated"
+                variants={cardVariants}
+                className="card-base h-full overflow-hidden flex flex-col group hover:shadow-card-elevated"
               >
                 {/* Recipe Photography Header */}
                 <div className="relative h-44 w-full bg-paper-muted overflow-hidden">
@@ -291,6 +286,10 @@ export default function Community({
                     alt={r.recipeTitle}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = '/images/fallback.jpg';
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
 
@@ -321,7 +320,7 @@ export default function Community({
                 </div>
 
                 {/* Card Body */}
-                <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
+                <div className="p-5 space-y-3 flex-1 flex flex-col">
                   <div className="space-y-2">
                     <h3 className="font-heading text-lg font-bold text-ink group-hover:text-tomato transition-colors line-clamp-1">
                       {r.recipeTitle}
@@ -347,12 +346,24 @@ export default function Community({
                         </span>
                       )}
                     </div>
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {(r.tags || []).slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-[10px] px-2 py-0.5 rounded-full bg-basil/10 text-basil border border-basil/20 capitalize"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Footer Action: Steps count & Save to My Recipes */}
-                  <div className="pt-3 border-t border-paper-border flex items-center justify-between mt-3">
+                  <div className="pt-3 border-t border-paper-border flex items-center justify-between mt-auto">
                     <span className="text-xs text-ink-muted flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-basil" />
+                      <span>{r.cookTime ? `${r.cookTime} min` : 'Time n/a'}</span>
+                      <Utensils className="w-3.5 h-3.5 ml-2 text-tomato" />
                       <span>{(r.recipeSteps || []).length} steps</span>
                     </span>
 
@@ -369,7 +380,8 @@ export default function Community({
               </motion.div>
             );
           })}
-        </div>
+          </motion.div>
+        </>
       )}
 
       {/* Share / Publish Modal */}

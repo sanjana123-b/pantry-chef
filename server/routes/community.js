@@ -35,7 +35,17 @@ router.get('/community', async (req, res) => {
 // POST /api/community - Publish a recipe to the Community Exchange
 router.post('/community', async (req, res) => {
   try {
-    const { authorName, authorTitle, recipeTitle, recipeDescription, ingredients, recipeSteps } = req.body;
+    const {
+      authorName,
+      authorTitle,
+      recipeTitle,
+      recipeDescription,
+      ingredients,
+      recipeSteps,
+      cookTime,
+      tags,
+      imagePath,
+    } = req.body;
 
     if (!recipeTitle) {
       return res.status(400).json({
@@ -51,6 +61,9 @@ router.post('/community', async (req, res) => {
       recipeDescription: recipeDescription?.trim() || '',
       ingredients: Array.isArray(ingredients) ? ingredients : [],
       recipeSteps: Array.isArray(recipeSteps) ? recipeSteps : [],
+      cookTime: Number.isFinite(cookTime) ? cookTime : undefined,
+      tags: Array.isArray(tags) ? tags : [],
+      imagePath: typeof imagePath === 'string' ? imagePath : undefined,
     });
 
     return res.status(201).json({

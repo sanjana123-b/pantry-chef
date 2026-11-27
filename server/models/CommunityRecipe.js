@@ -1,68 +1,9 @@
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { isDBConnected } from '../config/db.js';
+import SEED_RECIPES from '../data/communityRecipes.js';
 
-// In-Memory store fallback
 const memoryCommunityStore = new Map();
-
-// Seed initial community recipes so the feed is vibrant and inspiring immediately
-const SEED_RECIPES = [
-  {
-    _id: 'seed-1',
-    id: 'seed-1',
-    authorName: 'Chef Clara',
-    authorTitle: 'Zero-Waste Artisan',
-    recipeTitle: 'Caramelized Onion & Potato Skillet Frittata',
-    recipeDescription: 'An honest skillet lunch utilizing leftover boiled potatoes and slow-browned sweet onions.',
-    ingredients: ['Potatoes', 'Onions', 'Eggs', 'Olive Oil', 'Black Pepper'],
-    recipeSteps: [
-      'Slice cold cooked potatoes into 1/4-inch coins.',
-      'Slowly caramelize sliced onions in 2 tbsp olive oil until deep golden brown (approx 10 mins).',
-      'Whisk 4 eggs with salt, pepper, and a splash of water.',
-      'Layer potatoes over onions in the pan, pour eggs over, and cook on low flame for 6 mins.',
-      'Slide under broiler for 2 mins until puffed and golden. Serve warm.'
-    ],
-    stampsCount: 42,
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    _id: 'seed-2',
-    id: 'seed-2',
-    authorName: 'Chef Mateo',
-    authorTitle: 'Crisper Drawer Wizard',
-    recipeTitle: 'Rustic Garlic Tomato Bean Stew',
-    recipeDescription: 'A 15-minute hearty pantry reduction made exclusively with canned staples and herbs.',
-    ingredients: ['Cannellini Beans', 'Canned Tomatoes', 'Garlic', 'Olive Oil', 'Dried Oregano'],
-    recipeSteps: [
-      'Gently heat 3 tbsp olive oil in a saucepan with 4 smashed garlic cloves until fragrant.',
-      'Add whole canned tomatoes, crushing them lightly with a wooden spoon.',
-      'Rinse beans and stir into the simmering sauce with oregano and sea salt.',
-      'Simmer for 10 minutes until thick and glossy. Serve with crusty bread.'
-    ],
-    stampsCount: 38,
-    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-  },
-  {
-    _id: 'seed-3',
-    id: 'seed-3',
-    authorName: 'Chef Sophie',
-    authorTitle: 'Weekend Baker & Cook',
-    recipeTitle: 'Crispy Wilted Spinach & Garlic Butter Rice',
-    recipeDescription: 'Transform day-old cold rice into a golden, fragrant bowl packed with greens.',
-    ingredients: ['Cooked Rice', 'Spinach', 'Garlic', 'Butter', 'Soy Sauce'],
-    recipeSteps: [
-      'Melt butter in a wide frying pan over medium-high heat with minced garlic.',
-      'Add day-old rice, pressing down flat to develop a crispy, golden bottom layer (4 mins).',
-      'Toss in fresh spinach leaves, letting them wilt in the residual pan steam.',
-      'Drizzle with a dash of soy sauce, toss well, and serve steaming hot.'
-    ],
-    stampsCount: 29,
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-  }
-];
-
-// Initialize memory store with seed recipes
-SEED_RECIPES.forEach((r) => memoryCommunityStore.set(r.id, { ...r }));
 
 const communityRecipeSchema = new mongoose.Schema(
   {
@@ -72,6 +13,9 @@ const communityRecipeSchema = new mongoose.Schema(
     recipeDescription: { type: String, required: true, trim: true },
     ingredients: { type: [String], default: [] },
     recipeSteps: { type: [String], default: [] },
+    cookTime: { type: Number, min: 1 },
+    tags: { type: [String], default: [] },
+    imagePath: { type: String, trim: true },
     stampsCount: { type: Number, default: 1 },
     createdAt: { type: Date, default: Date.now },
   },
@@ -81,6 +25,31 @@ const communityRecipeSchema = new mongoose.Schema(
 const MongooseCommunityRecipe = mongoose.model('CommunityRecipe', communityRecipeSchema);
 
 export const CommunityRepository = {
+  async seedMissing() {
+    if (isDBConnected()) {
+      await Promise.all(
+        SEED_RECIPES.map((recipe) => {
+          const { _id, id, ...seedData } = recipe;
+          return MongooseCommunityRecipe.updateOne(
+            { recipeTitle: recipe.recipeTitle },
+            { $setOnInsert: seedData },
+            { upsert: true }
+          );
+        })
+      );
+      return;
+    }
+
+    const existingTitles = new Set(
+      Array.from(memoryCommunityStore.values()).map((recipe) => recipe.recipeTitle.toLowerCase())
+    );
+    SEED_RECIPES.forEach((recipe) => {
+      if (!existingTitles.has(recipe.recipeTitle.toLowerCase())) {
+        memoryCommunityStore.set(recipe.id, { ...recipe });
+      }
+    });
+  },
+
   async getAll() {
     let list = [];
     if (isDBConnected()) {
@@ -115,6 +84,9 @@ export const CommunityRepository = {
         recipeDescription: data.recipeDescription?.trim() || '',
         ingredients: data.ingredients || [],
         recipeSteps: data.recipeSteps || [],
+        cookTime: data.cookTime,
+        tags: data.tags || [],
+        imagePath: data.imagePath,
         stampsCount: 1,
       });
     }
@@ -129,6 +101,9 @@ export const CommunityRepository = {
       recipeDescription: data.recipeDescription?.trim() || '',
       ingredients: data.ingredients || [],
       recipeSteps: data.recipeSteps || [],
+      cookTime: data.cookTime,
+      tags: data.tags || [],
+      imagePath: data.imagePath,
       stampsCount: 1,
       createdAt: new Date().toISOString(),
     };

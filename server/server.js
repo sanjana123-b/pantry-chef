@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 
 import { connectDB } from './config/db.js';
 import { sessionUser } from './middleware/sessionUser.js';
+import { CommunityRepository } from './models/CommunityRecipe.js';
 import recipesRouter from './routes/recipes.js';
 import favoritesRouter from './routes/favorites.js';
 import authRouter from './routes/auth.js';
@@ -22,9 +23,6 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.set('trust proxy', 1);
-
-// Connect to MongoDB (with fallback in-memory instance)
-connectDB();
 
 // CORS configuration
 const allowedOrigins = [
@@ -71,9 +69,19 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🍲 PantryChef Server running on http://localhost:${PORT}`);
-  console.log(`📜 Ready to craft recipes from pantry staples`);
-  console.log(`🔑 Gemini API Key: ${process.env.GEMINI_API_KEY ? 'Detected' : 'Not detected (running in fallback mode)'}`);
-  console.log(`🤖 Gemini Model: ${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}\n`);
+const startServer = async () => {
+  await connectDB();
+  await CommunityRepository.seedMissing();
+
+  app.listen(PORT, () => {
+    console.log(`\n🍲 PantryChef Server running on http://localhost:${PORT}`);
+    console.log(`📜 Ready to craft recipes from pantry staples`);
+    console.log(`🔑 Gemini API Key: ${process.env.GEMINI_API_KEY ? 'Detected' : 'Not detected (running in fallback mode)'}`);
+    console.log(`🤖 Gemini Model: ${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}\n`);
+  });
+};
+
+startServer().catch((error) => {
+  console.error('Failed to seed community recipes or start server:', error);
+  process.exitCode = 1;
 });
